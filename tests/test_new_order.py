@@ -23,8 +23,8 @@ base_url = "https://api.sandbox.gemini.com"
 endpoint = "/v1/order/new"
 url = base_url + endpoint
 
-gemini_api_key = "account-iDp4LehhNXFOebUikonS"
-gemini_api_secret = "CFG4EiSa4bKunGvyrABawKagpGf".encode()
+gemini_api_key = "account"
+gemini_api_secret = "secret".encode()
 
 
 
