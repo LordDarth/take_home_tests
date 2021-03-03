@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+	font-family: Helvetica, Arial, sans-serif;
+	font-size: 12px;
+	/* do not increase min-width as some may use split screens */
+	min-width: 800px;
+	color: #999;
+}
+
+h1 {
+	font-size: 24px;
+	color: black;
+}
+
+h2 {
+	font-size: 16px;
+	color: black;
+}
+
+p {
+    color: black;
+}
+
+a {
+	color: #999;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+
+#environment td {
+	padding: 5px;
+	border: 1px solid #E6E6E6;
+}
+
+#environment tr:nth-child(odd) {
+	background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed, .passed .col-result {
+	color: green;
+}
+span.skipped, span.xfailed, span.rerun, .skipped .col-result, .xfailed .col-result, .rerun .col-result {
+	color: orange;
+}
+span.error, span.failed, span.xpassed, .error .col-result, .failed .col-result, .xpassed .col-result  {
+	color: red;
+}
+
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+
+#results-table {
+	border: 1px solid #e6e6e6;
+	color: #999;
+	font-size: 12px;
+	width: 100%
+}
+
+#results-table th, #results-table td {
+	padding: 5px;
+	border: 1px solid #E6E6E6;
+	text-align: left
+}
+#results-table th {
+	font-weight: bold
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+
+.log:only-child {
+	height: inherit
+}
+.log {
+	background-color: #e6e6e6;
+	border: 1px solid #e6e6e6;
+	color: black;
+	display: block;
+	font-family: "Courier New", Courier, monospace;
+	height: 230px;
+	overflow-y: scroll;
+	padding: 5px;
+	white-space: pre-wrap
+}
+div.image {
+	border: 1px solid #e6e6e6;
+	float: right;
+	height: 240px;
+	margin-left: 5px;
+	overflow: hidden;
+	width: 320px
+}
+div.image img {
+	width: 320px
+}
+div.video {
+	border: 1px solid #e6e6e6;
+	float: right;
+	height: 240px;
+	margin-left: 5px;
+	overflow: hidden;
+	width: 320px
+}
+div.video video {
+	overflow: hidden;
+	width: 320px;
+    height: 240px;
+}
+.collapsed {
+	display: none;
+}
+.expander::after {
+	content: " (show details)";
+	color: #BBB;
+	font-style: italic;
+	cursor: pointer;
+}
+.collapser::after {
+	content: " (hide details)";
+	color: #BBB;
+	font-style: italic;
+	cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+	cursor: pointer;
+}
+
+.sort-icon {
+	font-size: 0px;
+	float: left;
+	margin-right: 5px;
+	margin-top: 5px;
+	/*triangle*/
+	width: 0;
+	height: 0;
+	border-left: 8px solid transparent;
+	border-right: 8px solid transparent;
+}
+
+.inactive .sort-icon {
+	/*finish triangle*/
+	border-top: 8px solid #E6E6E6;
+}
+
+.asc.active .sort-icon {
+	/*finish triangle*/
+	border-bottom: 8px solid #999;
+}
+
+.desc.active .sort-icon {
+	/*finish triangle*/
+	border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else if (elem.classList.contains('links')) {
+        key = key_link;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() { // eslint-disable-line no-unused-vars
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() { // eslint-disable-line no-unused-vars
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    const extras = colresult_elem.parentNode.nextElementSibling;
+    const expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hide_extras(colresult_elem) {
+    const extras = colresult_elem.parentNode.nextElementSibling;
+    const expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function show_filters() {
+    const filter_items = document.getElementsByClassName('filter');
+    for (let i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        const collapsed = get_query_parameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function get_query_parameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sort_column(elem);
+            }, false);
+    });
+}
+
+function sort_table(clicked, key_func) {
+    const rows = find_all('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    const sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        const key_a = a[0];
+        const key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return key_a < key_b ? 1 : -1;
+        } else {
+            return key_a > key_b ? 1 : -1;
+        }
+    });
+
+    return sort_array.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_link(col_index) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[col_index].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+    return value.hidden == false;
+}
+
+function filter_table(elem) { // eslint-disable-line no-unused-vars
+    const outcome_att = 'data-test-result';
+    const outcome = elem.getAttribute(outcome_att);
+    const class_outcome = outcome + ' results-table-row';
+    const outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(let i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    const rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    const all_rows_hidden = rows.length == 0 ? true : false;
+    const not_found_message = document.getElementById('not-found-message');
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 04-Dec-2020 at 13:30:40 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.0.0</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.9.0", "pytest": "6.1.2"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Darwin-20.1.0-x86_64-i386-64bit</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"assume": "2.3.3", "html": "3.0.0", "metadata": "1.11.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.7.9</td></tr></table>
+    <h2>Summary</h2>
+    <p>26 tests ran in 36.21 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">22 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">4 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_indication_of_interest_sell</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_new_order.py:788: in test_new_order_limit_indication_of_interest_sell<br/>    assert not errors, &quot;order rejected:\n{}&quot;.format(&quot;\n&quot;.join(errors))<br/><span class="error">E   AssertionError: order rejected:</span><br/><span class="error">E     order rejected</span><br/><span class="error">E     Invalid price for symbol BTCUSD: 19600.00</span><br/><span class="error">E   assert not [&#x27;order rejected&#x27;, &#x27;Invalid price for symbol BTCUSD: 19600.00&#x27;]</span><br/> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol BTCUSD: 19600.00&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_stop_limit_buy</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_new_order.py:261: in test_new_order_stop_limit_buy<br/>    assert not errors, &quot;order rejected:\n{}&quot;.format(&quot;\n&quot;.join(errors))<br/><span class="error">E   AssertionError: order rejected:</span><br/><span class="error">E     order rejected</span><br/><span class="error">E     Invalid price for symbol BTCUSD: 19500.00</span><br/><span class="error">E   assert not [&#x27;order rejected&#x27;, &#x27;Invalid price for symbol BTCUSD: 19500.00&#x27;]</span><br/> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol BTCUSD: 19500.00&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_stop_limit_trigger_buy</td>
+          <td class="col-duration">3.57</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_new_order.py:1163: in test_new_order_stop_limit_trigger_buy<br/>    assert not errors, &quot;order rejected:\n{}&quot;.format(&quot;\n&quot;.join(errors))<br/><span class="error">E   AssertionError: order rejected:</span><br/><span class="error">E     order rejected</span><br/><span class="error">E     Invalid price for symbol BTCUSD: 19150.00</span><br/><span class="error">E   assert not [&#x27;order rejected&#x27;, &#x27;Invalid price for symbol BTCUSD: 19150.00&#x27;]</span><br/> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol BTCUSD: 19150.00&#x27;}
+{&#x27;order_id&#x27;: &#x27;677717134&#x27;, &#x27;id&#x27;: &#x27;677717134&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110221&#x27;, &#x27;timestampms&#x27;: 1607110221067, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;19000.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+{&#x27;order_id&#x27;: &#x27;677717137&#x27;, &#x27;id&#x27;: &#x27;677717137&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;19018.28872028&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110222&#x27;, &#x27;timestampms&#x27;: 1607110222253, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;1&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;19000.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+trade----
+{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol BTCUSD: 19150.00&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_orders_trade</td>
+          <td class="col-duration">2.38</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_new_order.py:937: in test_new_orders_trade<br/>    assert not errors, &quot;errors occured:\n{}&quot;.format(&quot;\n&quot;.join(errors))<br/><span class="error">E   AssertionError: errors occured:</span><br/><span class="error">E     buy executed amount did not match</span><br/><span class="error">E   assert not [&#x27;buy executed amount did not match&#x27;]</span><br/> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677717175&#x27;, &#x27;id&#x27;: &#x27;677717175&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110227&#x27;, &#x27;timestampms&#x27;: 1607110227007, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;3633.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+{&#x27;order_id&#x27;: &#x27;677717178&#x27;, &#x27;id&#x27;: &#x27;677717178&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;19015.55691165&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110228&#x27;, &#x27;timestampms&#x27;: 1607110228207, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;1&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;3633.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_buy</td>
+          <td class="col-duration">0.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716954&#x27;, &#x27;id&#x27;: &#x27;677716954&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110204&#x27;, &#x27;timestampms&#x27;: 1607110204319, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;3633.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_client_order_id_buy</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716957&#x27;, &#x27;id&#x27;: &#x27;677716957&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110205&#x27;, &#x27;timestampms&#x27;: 1607110205516, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;client_order_id&#x27;: &#x27;lakulish2020-12-04 13:30:05.255045&#x27;, &#x27;options&#x27;: [&#x27;maker-or-cancel&#x27;], &#x27;price&#x27;: &#x27;3633.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_fill_or_kill_buy</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716960&#x27;, &#x27;id&#x27;: &#x27;677716960&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110206&#x27;, &#x27;timestampms&#x27;: 1607110206699, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: True, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;reason&#x27;: &#x27;FillOrKillWouldNotFill&#x27;, &#x27;options&#x27;: [&#x27;fill-or-kill&#x27;], &#x27;price&#x27;: &#x27;3600.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_fill_or_kill_sell</td>
+          <td class="col-duration">1.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716965&#x27;, &#x27;id&#x27;: &#x27;677716965&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;19024.04042516&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110207&#x27;, &#x27;timestampms&#x27;: 1607110207873, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;1&#x27;, &#x27;options&#x27;: [&#x27;fill-or-kill&#x27;], &#x27;price&#x27;: &#x27;3600.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_immediate_or_cancel_buy</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716978&#x27;, &#x27;id&#x27;: &#x27;677716978&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110209&#x27;, &#x27;timestampms&#x27;: 1607110209059, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: True, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;reason&#x27;: &#x27;ImmediateOrCancelWouldPost&#x27;, &#x27;options&#x27;: [&#x27;immediate-or-cancel&#x27;], &#x27;price&#x27;: &#x27;3600.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_immediate_or_cancel_sell</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716983&#x27;, &#x27;id&#x27;: &#x27;677716983&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;19024.04&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110210&#x27;, &#x27;timestampms&#x27;: 1607110210248, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;1&#x27;, &#x27;options&#x27;: [&#x27;immediate-or-cancel&#x27;], &#x27;price&#x27;: &#x27;3600.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_indication_of_interest_buy</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716989&#x27;, &#x27;id&#x27;: &#x27;677716989&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;indication-of-interest limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110211&#x27;, &#x27;timestampms&#x27;: 1607110211435, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: True, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [&#x27;indication-of-interest&#x27;], &#x27;price&#x27;: &#x27;19633.00&#x27;, &#x27;original_amount&#x27;: &#x27;100&#x27;, &#x27;remaining_amount&#x27;: &#x27;100&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_maker_or_cancel_buy</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716996&#x27;, &#x27;id&#x27;: &#x27;677716996&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110213&#x27;, &#x27;timestampms&#x27;: 1607110213915, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [&#x27;maker-or-cancel&#x27;], &#x27;price&#x27;: &#x27;3600.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_limit_maker_or_cancel_sell</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677716999&#x27;, &#x27;id&#x27;: &#x27;677716999&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110215&#x27;, &#x27;timestampms&#x27;: 1607110215094, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: True, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;reason&#x27;: &#x27;MakerOrCancelWouldTake&#x27;, &#x27;options&#x27;: [&#x27;maker-or-cancel&#x27;], &#x27;price&#x27;: &#x27;3600.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_sell</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677717005&#x27;, &#x27;id&#x27;: &#x27;677717005&#x27;, &#x27;symbol&#x27;: &#x27;ethusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110216&#x27;, &#x27;timestampms&#x27;: 1607110216287, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;1500.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_stop_limit_sell</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677717061&#x27;, &#x27;id&#x27;: &#x27;677717061&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;stop-limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110218&#x27;, &#x27;timestampms&#x27;: 1607110218687, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;stop_price&#x27;: &#x27;17000.00&#x27;, &#x27;price&#x27;: &#x27;15000.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order.py::TestNewOrderPositive::test_new_order_stop_limit_trigger_sell</td>
+          <td class="col-duration">3.55</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;677717156&#x27;, &#x27;id&#x27;: &#x27;677717156&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;stop-limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110223&#x27;, &#x27;timestampms&#x27;: 1607110223459, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;stop_price&#x27;: &#x27;17000.00&#x27;, &#x27;price&#x27;: &#x27;15000.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;}
+{&#x27;order_id&#x27;: &#x27;677717159&#x27;, &#x27;id&#x27;: &#x27;677717159&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;buy&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110224&#x27;, &#x27;timestampms&#x27;: 1607110224644, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;17000.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;1&#x27;}
+{&#x27;order_id&#x27;: &#x27;677717162&#x27;, &#x27;id&#x27;: &#x27;677717162&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;19016.83909757&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1607110225&#x27;, &#x27;timestampms&#x27;: 1607110225823, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;1&#x27;, &#x27;options&#x27;: [], &#x27;price&#x27;: &#x27;17000.00&#x27;, &#x27;original_amount&#x27;: &#x27;1&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_buy_invalid_side</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidSide&#x27;, &#x27;message&#x27;: &quot;Invalid side for symbol BTCUSD: &#x27;buyer&#x27;&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_buy_invalid_symbol</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidSymbol&#x27;, &#x27;message&#x27;: &quot;Received unsupported symbol &#x27;eth2usd&#x27;&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_buy_invalid_type</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidOrderType&#x27;, &#x27;message&#x27;: &quot;Invalid order type for symbol BTCUSD: &#x27;invalid type&#x27;&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_sell_invalid_side</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidSide&#x27;, &#x27;message&#x27;: &quot;Invalid side for symbol ETHUSD: &#x27;seller&#x27;&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_sell_invalid_symbol</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidSymbol&#x27;, &#x27;message&#x27;: &quot;Received unsupported symbol &#x27;eth2usd&#x27;&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_sell_invalid_type</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidOrderType&#x27;, &#x27;message&#x27;: &quot;Invalid order type for symbol ETHUSD: &#x27;invalid type&#x27;&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_stop_limit_buy_invalid_option</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;ConflictingOptions&#x27;, &#x27;message&#x27;: &#x27;Stop Limit orders only support Standard order behavior.&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_stop_limit_buy_invalid_stop_price</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidStopPriceBuy&#x27;, &#x27;message&#x27;: &#x27;Stop Price: $3,800.00 must be lower than Price: $3,600.00 for Stop Limit buy Orders&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_stop_limit_sell_invalid_option</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;ConflictingOptions&#x27;, &#x27;message&#x27;: &#x27;Stop Limit orders only support Standard order behavior.&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_new_order_negative.py::TestNewOrderNegative::test_new_order_stop_limit_sell_invalid_stop_price</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidStopPriceSell&#x27;, &#x27;message&#x27;: &#x27;Stop Price: $14,000.00 must be greater than Price: $15,000.00 for Stop Limit sell Orders&#x27;}
+<br/></div></td></tr></tbody></table></body></html>
